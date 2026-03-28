@@ -8,9 +8,14 @@ A `PreToolUse` hook for [Claude Code](https://docs.anthropic.com/en/docs/claude-
 |---|---|
 | `rm -rf` | Recursive forced deletion — can wipe your entire filesystem |
 | `DROP TABLE` | Permanently destroys a database table and all its data |
+| `DROP DATABASE` | Permanently destroys an entire database and all its contents |
+| `DROP SCHEMA` | Permanently destroys a database schema and everything it contains |
 | `git push --force` / `-f` | Rewrites remote history, destroying commits for all collaborators |
 | `TRUNCATE` | Removes all rows from a table instantly, usually non-rollbackable |
 | `DELETE FROM` without `WHERE` | Deletes every row in a table |
+| Fork bomb `:(){ :|:& };:` | Recursively spawns processes until the system crashes |
+| `mkfs.*` | Formats a block device — destroys all data on it |
+| `dd ... of=/dev/...` | Writes directly to a block device — can destroy disks |
 
 Every blocked attempt is logged to `~/.claude/hooks/blocked.log` with a timestamp, the command, and the project path.
 

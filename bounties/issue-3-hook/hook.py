@@ -5,11 +5,16 @@ Claude Code pre-tool-use hook: Anti-Destructive Command Guard
 Intercepts dangerous bash/SQL commands before Claude executes them.
 
 Blocks:
-  - rm -rf      : recursive forced deletion
-  - DROP TABLE  : irreversible table destruction
-  - git push --force / -f : rewrites remote history
-  - TRUNCATE    : wipes entire tables
+  - rm -rf               : recursive forced deletion
+  - DROP TABLE           : irreversible table destruction
+  - DROP DATABASE        : destroys entire database
+  - DROP SCHEMA          : destroys entire schema
+  - git push --force/-f  : rewrites remote history
+  - TRUNCATE             : wipes entire tables
   - DELETE FROM without WHERE : deletes all rows
+  - fork bomb :(){ ... } : crashes / saturates the system
+  - mkfs.*               : formats a block device
+  - dd ... of=/dev/...   : writes directly to a block device
 
 Logs every blocked attempt to: ~/.claude/hooks/blocked.log
 """
@@ -50,6 +55,21 @@ DANGEROUS_PATTERNS = [
         ),
     ),
     (
+        re.compile(r'\bDROP\s+DATABASE\b', re.IGNORECASE),
+        (
+            "DROP DATABASE detected: this permanently destroys an entire database and all "
+            "its tables, indexes, and data. If intentional, run it manually in a database "
+            "client with a full backup confirmed."
+        ),
+    ),
+    (
+        re.compile(r'\bDROP\s+SCHEMA\b', re.IGNORECASE),
+        (
+            "DROP SCHEMA detected: this permanently destroys a database schema and "
+            "everything it contains. If intentional, run it manually with a backup ready."
+        ),
+    ),
+    (
         re.compile(
             r'\bgit\s+push\b.*?(\s--force\b|\s-f\b|\s--force-with-lease\b)',
             re.IGNORECASE | re.DOTALL,
@@ -65,6 +85,34 @@ DANGEROUS_PATTERNS = [
         (
             "TRUNCATE detected: this removes ALL rows from a table instantly and "
             "cannot be rolled back in most configurations. Run manually with a backup."
+        ),
+    ),
+    # Fork bomb: :(){ :|:& };: and common variants
+    (
+        re.compile(
+            r':\s*\(\s*\)\s*\{.*?:\s*\|.*?:.*?&.*?\}|'   # :(){ :|:& };:
+            r':\(\)\s*\{\s*\|\s*&\s*\}\s*;',
+            re.DOTALL,
+        ),
+        (
+            "Fork bomb detected: this shell construct recursively spawns processes until "
+            "the system runs out of resources and crashes. Never run this command."
+        ),
+    ),
+    # mkfs.* — formats/destroys a filesystem on a block device
+    (
+        re.compile(r'\bmkfs\b', re.IGNORECASE),
+        (
+            "mkfs detected: this formats a block device, permanently destroying all data "
+            "on it. If intentional, run it manually after triple-checking the target device."
+        ),
+    ),
+    # dd writing directly to a block device
+    (
+        re.compile(r'\bdd\b.*\bof\s*=\s*/dev/', re.IGNORECASE | re.DOTALL),
+        (
+            "dd of=/dev/... detected: writing directly to a block device can permanently "
+            "destroy the filesystem or partition table. Run manually with extreme caution."
         ),
     ),
 ]
